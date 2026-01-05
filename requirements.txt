@@ -1,0 +1,13 @@
+# Web Backend
+fastapi
+uvicorn
+jinja2
+
+# ML
+scikit-learn
+pandas
+numpy
+joblib
+
+# (opsional tapi aman, karena kamu bikin heatmap)
+matplotlib
