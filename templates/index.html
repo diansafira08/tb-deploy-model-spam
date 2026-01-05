@@ -2,57 +2,207 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Spam Email Classifier</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Spam SMS Classifier</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="min-h-screen flex items-center justify-center bg-gray-100">
-  <div class="w-full max-w-2xl p-8 bg-white rounded-2xl shadow">
-    <h1 class="text-2xl font-bold mb-2 text-center">Spam Email Classifier</h1>
-    <p class="text-center text-gray-600 mb-6">
-      Masukkan isi email, lalu klik Predict.
+
+<body class="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white">
+  <div class="max-w-5xl mx-auto px-4 py-10">
+    <!-- Header -->
+    <div class="flex items-center justify-between gap-4 mb-8">
+      <div>
+        <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight">
+          Spam SMS Classifier
+        </h1>
+        <p class="text-white/70 mt-2">
+          Masukkan isi pesan, lalu klik Predict. Hasil menampilkan label + confidence.
+        </p>
+      </div>
+
+      <div class="hidden md:flex items-center gap-2">
+        <span class="px-3 py-1 rounded-full bg-white/10 border border-white/10 text-sm">FastAPI</span>
+        <span class="px-3 py-1 rounded-full bg-white/10 border border-white/10 text-sm">SVM + TF-IDF</span>
+        <span class="px-3 py-1 rounded-full bg-white/10 border border-white/10 text-sm">Railway</span>
+      </div>
+    </div>
+
+    <!-- Main Card -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Input -->
+      <div class="lg:col-span-2 rounded-2xl bg-white/5 border border-white/10 shadow-xl p-6">
+        <label class="block text-sm text-white/70 mb-2">Isi pesan</label>
+        <textarea id="email" rows="7"
+          class="w-full rounded-xl bg-slate-950/60 border border-white/10 p-4 outline-none focus:ring-2 focus:ring-indigo-400/60"
+          placeholder="Contoh: Selamat! Anda menang undian..."></textarea>
+
+        <div class="flex flex-col sm:flex-row gap-3 mt-4">
+          <button id="predictBtn"
+            class="flex-1 rounded-xl bg-indigo-500 hover:bg-indigo-400 active:bg-indigo-600 transition px-4 py-3 font-semibold">
+            Predict
+          </button>
+
+          <button id="clearBtn"
+            class="rounded-xl bg-white/10 hover:bg-white/15 transition px-4 py-3 font-semibold">
+            Clear
+          </button>
+        </div>
+
+        <!-- Quick examples (diambil dari dataset lewat backend) -->
+        <div class="mt-5">
+          <p class="text-sm text-white/60 mb-2">Contoh cepat (klik untuk isi otomatis):</p>
+          <div class="flex flex-wrap gap-2">
+            <button class="exBtn px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
+              data-text="{{ sample_spam | e }}">
+              Contoh SPAM
+            </button>
+            <button class="exBtn px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
+              data-text="{{ sample_ham | e }}">
+              Contoh HAM
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Output -->
+      <div class="rounded-2xl bg-white/5 border border-white/10 shadow-xl p-6">
+        <p class="text-sm text-white/70">Hasil Prediksi</p>
+
+        <div id="status" class="mt-3 text-white/60 text-sm">Belum ada prediksi.</div>
+
+        <div class="mt-5 flex items-center gap-3">
+          <div id="badge" class="hidden px-3 py-1 rounded-full text-sm font-bold border">
+            SPAM
+          </div>
+          <div class="text-2xl font-extrabold" id="label">-</div>
+        </div>
+
+        <div class="mt-4">
+          <div class="flex justify-between text-sm text-white/70">
+            <span>Confidence</span>
+            <span id="confText">-</span>
+          </div>
+          <div class="mt-2 h-3 rounded-full bg-white/10 overflow-hidden">
+            <div id="confBar" class="h-3 w-0 bg-indigo-400"></div>
+          </div>
+        </div>
+
+        <!-- History -->
+        <div class="mt-6">
+          <p class="text-sm text-white/70 mb-2">Riwayat (terakhir 5):</p>
+          <div id="history" class="space-y-2"></div>
+        </div>
+      </div>
+    </div>
+
+    <p class="text-white/40 text-xs mt-8">
+      Catatan: confidence adalah probabilitas model pada input yang diberikan.
     </p>
-
-    <textarea id="email" rows="6"
-      class="w-full p-3 border rounded-lg focus:outline-none focus:ring"
-      placeholder="Contoh: Congratulations! You won a prize..."></textarea>
-
-    <button id="predictBtn"
-      class="mt-4 w-full py-3 bg-black text-white rounded-lg hover:opacity-90">
-      Predict
-    </button>
-
-    <div id="result" class="mt-5 text-center text-lg font-semibold"></div>
   </div>
 
   <script>
     const btn = document.getElementById("predictBtn");
+    const clearBtn = document.getElementById("clearBtn");
     const emailInput = document.getElementById("email");
-    const resultDiv = document.getElementById("result");
 
-    btn.addEventListener("click", async () => {
+    const statusEl = document.getElementById("status");
+    const labelEl = document.getElementById("label");
+    const badgeEl = document.getElementById("badge");
+    const confTextEl = document.getElementById("confText");
+    const confBarEl = document.getElementById("confBar");
+    const historyEl = document.getElementById("history");
+
+    const history = [];
+
+    function setBadge(pred) {
+      badgeEl.classList.remove("hidden");
+      badgeEl.classList.remove("bg-red-500/20","border-red-400/40","text-red-200");
+      badgeEl.classList.remove("bg-emerald-500/20","border-emerald-400/40","text-emerald-200");
+      badgeEl.classList.remove("bg-white/10","border-white/20","text-white");
+
+      if (pred === "spam") {
+        badgeEl.textContent = "SPAM";
+        badgeEl.classList.add("bg-red-500/20","border-red-400/40","text-red-200");
+      } else if (pred === "ham") {
+        badgeEl.textContent = "HAM";
+        badgeEl.classList.add("bg-emerald-500/20","border-emerald-400/40","text-emerald-200");
+      } else {
+        badgeEl.textContent = pred.toUpperCase();
+        badgeEl.classList.add("bg-white/10","border-white/20","text-white");
+      }
+    }
+
+    function pushHistory(pred, conf) {
+      history.unshift({ pred, conf, t: new Date().toLocaleTimeString() });
+      if (history.length > 5) history.pop();
+
+      historyEl.innerHTML = "";
+      history.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "rounded-xl bg-white/5 border border-white/10 p-3 text-sm flex items-center justify-between";
+        div.innerHTML = `
+          <span class="text-white/80">${item.t}</span>
+          <span class="font-semibold">${item.pred}</span>
+          <span class="text-white/70">${item.conf}</span>
+        `;
+        historyEl.appendChild(div);
+      });
+    }
+
+    async function doPredict() {
       const email = emailInput.value.trim();
-
       if (!email) {
-        resultDiv.textContent = "Email tidak boleh kosong.";
+        statusEl.textContent = "Pesan tidak boleh kosong.";
         return;
       }
 
-      resultDiv.textContent = "Processing...";
+      statusEl.textContent = "Memproses...";
+      btn.disabled = true;
+      btn.classList.add("opacity-70","cursor-not-allowed");
 
       try {
         const res = await fetch("/predict", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {"Content-Type":"application/json"},
           body: JSON.stringify({ email })
         });
 
         const data = await res.json();
-        resultDiv.textContent =
-          `Prediction: ${data.prediction} | Confidence: ${data.confidence}`;
-      } catch (err) {
-        resultDiv.textContent = "Terjadi error. Coba lagi.";
+        const pred = data.prediction;
+        const conf = Number(data.confidence);
+
+        labelEl.textContent = pred;
+        setBadge(pred);
+
+        const percent = Math.max(0, Math.min(100, Math.round(conf * 100)));
+        confTextEl.textContent = `${conf} (${percent}%)`;
+        confBarEl.style.width = percent + "%";
+
+        statusEl.textContent = "Selesai.";
+        pushHistory(pred, conf);
+      } catch (e) {
+        statusEl.textContent = "Terjadi error saat prediksi.";
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove("opacity-70","cursor-not-allowed");
       }
+    }
+
+    btn.addEventListener("click", doPredict);
+
+    clearBtn.addEventListener("click", () => {
+      emailInput.value = "";
+      statusEl.textContent = "Dikosongkan.";
+      labelEl.textContent = "-";
+      badgeEl.classList.add("hidden");
+      confTextEl.textContent = "-";
+      confBarEl.style.width = "0%";
+    });
+
+    document.querySelectorAll(".exBtn").forEach(b => {
+      b.addEventListener("click", () => {
+        emailInput.value = b.dataset.text;
+      });
     });
   </script>
 </body>
