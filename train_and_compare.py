@@ -8,7 +8,6 @@
 # PENTING:
 # - File dataset diletakkan di root project dengan nama: spam.csv
 # - Script ini otomatis mencoba deteksi kolom label & teks
-# - Ada PRINT cek dataset (head + label counts) supaya kamu yakin yang kebaca benar
 # =========================================================
 
 import pickle
@@ -161,7 +160,7 @@ def main():
 
     # ✅ PENTING UNTUK INDONESIA:
     # JANGAN pakai stop_words="english"
-    # dan jangan pakai stopwords indo kasar dulu (bisa buang kata penting)
+    
     vectorizer = TfidfVectorizer(
         lowercase=True,
         ngram_range=(1, 2),

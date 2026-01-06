@@ -9,5 +9,5 @@ pandas
 numpy
 joblib
 
-# (opsional tapi aman, karena kamu bikin heatmap)
+# bikin heatmap
 matplotlib
